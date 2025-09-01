@@ -1,0 +1,311 @@
+# 找到 安全问题风险分析 所在页范围的方法类
+import os
+import re
+import pymupdf
+from server.tools.base import sort_block, contain_key
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+# 获取文件目录所在页的方法
+# 找出页脚的block,判断是否包含 "目录"
+def is_outline_page(blocks):
+    sorted_blocks = sort_block(blocks)
+    last_block = sorted_blocks[-1]
+    return contain_key(last_block[4], "目录")
+
+
+# 抽取block_text信息
+# block_text:
+# 5 \n安全问题风险分析 ................ 132 \n
+# return: ("5","安全问题风险分析",132)
+def get_outline_block_info(block_text: str) -> (str, str, int):
+    text = block_text.replace("\n", "")
+    text = text.replace(" ", "")
+    text = text.replace(".", "")
+    text = text.strip()
+    chapter_pattern = r'^\d+'  # 从头开始匹配首个数字
+    page_pattern = r'\d+$'  # 从尾部开始匹配多个数字
+    chapter_match = re.search(chapter_pattern, text)
+    page_match = re.search(page_pattern, text)
+    index_str = chapter_match.group()
+    first_len = len(index_str)
+    page_str = page_match.group()
+    last_len = len(page_str)
+    show_page_num = int(page_match.group())
+    content = text[first_len:-last_len]
+    return index_str, content, show_page_num
+
+
+# 定位到一页中具体包含keyword的block-index信息
+def locate_target_block_index(blocks, keyword):
+    for idx, block in enumerate(blocks):
+        text = block[4]
+        if contain_key(text, keyword):
+            return idx
+    return -1
+
+
+# 从start_index开始寻找，如果解析出来的chapter = target_chapter
+def get_chapter_block_index(blocks, start_index, keyword):
+    for idx in range(start_index + 1, len(blocks)):
+        if contain_key(blocks[idx][4], keyword):
+            return idx
+    return -1
+
+
+def get_match_num(blocks, key):
+    res = 0
+    for block in blocks:
+        if contain_key(block[4], key):
+            res += 1
+    return res
+
+
+# 根据span, 判断是否是页脚的正文
+def is_main_text_footer(span) -> bool:
+    if contain_key(span['text'], '正文') and span['size'] == 9.0:
+        return True
+    return False
+
+
+# 判断是否是目录的章节标题
+def is_outline_chapter(span) -> bool:
+    if contain_key(span['text'], '目录') and 15.9 <= span['size'] <= 16.0:
+        return True
+    return False
+
+
+def get_spans_by_blocks(blocks) -> list[dict]:
+    spans_list = []
+    for idx, block in enumerate(blocks):
+        type_int = block['type']
+        if type_int == 0:  # 只保留文本信息
+            lines = block["lines"]
+            for line in lines:
+                spans = line['spans']
+                direction = line["dir"]  # 获取文字方向向量
+                if direction[0] != 1.0 or direction[1] != 0.0:  # 去除倾斜方向的文字
+                    continue
+                spans_list.extend(spans)
+    return spans_list
+
+
+# 目录中每一条目的信息 #("5.1", "安全问题风险分析", 68)
+class LineInfo:
+    def __init__(self, chapter: str, title: str, page: int):
+        self.chapter = chapter
+        self.title = title
+        self.page = page
+
+
+# 给定候选目录条目列表，找出[安全问题风险分析]下一个条目
+def get_next_line(infoList: list[LineInfo]) -> LineInfo:
+    length = len(infoList)
+    if length == 2:
+        return infoList[1]
+    start_page = infoList[0].page
+    for i in range(1, length):
+        line = infoList[i]
+        if line.page > start_page:
+            return line
+
+
+# pdf解析类帮助方法
+class OutlineHelper:
+    def __init__(self, pdf_path, start_chapter="安全问题风险分析", end_chapter="等级测评结论"):
+        self.file_name = os.path.basename(pdf_path)
+        # 最后在外部显示的信息
+        self.start_page = 0  # 从1开始 安全问题风险 章节 开始所在页数
+        self.end_page = 0  # 从1开始 安全问题风险分析 下一章节 开始所在页数
+
+        self.start_chapter = start_chapter
+        self.end_chapter = end_chapter
+
+        try:
+            self.doc = pymupdf.open(pdf_path)
+            if self.doc is None or self.doc.page_count < 1:
+                logger.error(f"【{self.file_name}】 文件存在问题，无法读取!!!")
+                return
+
+            self.total_page_num = self.doc.page_count
+
+            self.first_page = self.__get_first_page()  # 第一个显示正文的页码
+            if self.first_page == 0:
+                logger.error(f"【{self.file_name}】 无法找到正文，存取的pdf可能是扫描件，不支持!!!")
+                return
+            self.difference = self.first_page - 1  # 表示实际页数和显示页数的差距，例如显示第1页，在pdf中是第10页，difference=9
+            # 获取目录 的开始页、结束页 页码
+            self.outline_start_page, self.outline_end_page = self.__get_outline_start_page(), self.first_page - 1
+            self.start_chapter, self.end_chapter, self.start_page, self.end_page = self.__get_target_page_info()
+            logger.info(
+                f"【{self.file_name}】的解析信息如下:\n【目录页信息】 开始页:{self.outline_start_page}\t结束页:{self.outline_end_page}\n"
+                f"【解析信息】 开始章节:{self.start_chapter} 开始页码:{self.start_page}\t结束章节:{self.end_chapter} 结束页码:{self.end_page}")
+        finally:
+            self.doc.close()
+
+    # 获取 显示的页码实际对应的页码index, 例如显示第1页，在pdf中第10页，返回10
+    def __get_actual_page(self, show_page_num):
+        return self.difference + show_page_num
+
+    def is_valid(self):
+        if self.first_page == 0 or self.start_page == 0 or self.end_page == 0:
+            return False
+        return True
+
+    # 获取正文 第一页对应的实际页码
+    def __get_first_page(self):
+        for index in range(int(0.2* self.total_page_num)):
+            blocks = self.__get_origin_blocks_by_page_index(index)
+            spans = get_spans_by_blocks(blocks)
+            for span in spans:
+                if is_main_text_footer(span):
+                    return index + 1
+        return 0
+
+    # 思路: 第一页目录包含三个目录关键字
+    # 返回目录起始页
+    def __get_outline_start_page(self) -> int:
+        for page_index in range(self.first_page):
+            blocks = self.__get_origin_blocks_by_page_index(page_index)
+            spans = get_spans_by_blocks(blocks)
+            for span in spans:
+                if is_outline_chapter(span):
+                    return page_index + 1
+        return 0
+
+    # 获取更详细的block文字信息
+    # 去除倾斜的水印信息
+    # (x0,y0,x1,y1,text,blok_index,type)
+    def __get_blocks_by_page_index(self, page_index):
+        page = self.doc.load_page(page_index)
+        blocks = page.get_text("dict")['blocks']
+        block_list = []
+        for idx, block in enumerate(blocks):
+            type = block['type']
+            bbox = block['bbox']
+            merge_text = ''
+            if type == 0:  # 只保留文本信息
+                lines = block["lines"]
+                for line in lines:
+                    spans = line['spans']
+                    direction = line["dir"]  # 获取文字方向向量
+                    if direction[0] != 1.0 or direction[1] != 0.0:  # 去除倾斜方向的文字
+                        continue
+                    for span in spans:
+                        text = span['text']
+                        merge_text += text
+                info = (bbox[0], bbox[1], bbox[2], bbox[3], merge_text, idx, type)
+                if merge_text != '':
+                    block_list.append(info)
+        return block_list
+
+    def __get_text_by_page(self, page_index):
+        page = self.doc.load_page(page_index)
+        return page.get_text()
+
+    def __get_origin_blocks_by_page_index(self, page_index):
+        page = self.doc.load_page(page_index)
+        return page.get_text("dict")['blocks']
+
+    # 根据目录所在页数，确定 “安全问题风险分析” 所在的页数index
+    def __locate_target_page(self, keyword: str) -> int:
+        for index in range(self.outline_start_page - 1, self.outline_end_page):
+            page = self.doc.load_page(index)
+            all_text = page.get_text("text")
+            if contain_key(all_text, keyword):
+                return index
+        return -1
+
+    # 获取 安全问题风险分析 章节 所在的页码
+    # 落地思路：最终目标找到 安全问题风险分析所在的实际页数
+    # 1. 找到目录所在的实际页码范围
+    # 2. 确定文件中显示的页码 和 实际对应的页码关系
+    # 3. 找到 安全问题风险分析 在目录范围内的具体某一页
+    # 4. 在该页中，找到 安全问题风险分析 在哪个block
+    # 5. 找到下一个章节的block
+    # 6. 找出开始，结束block对应的页码
+    # 7. 根据显示页码信息，给出对应的实际页码范围
+    def __get_target_page_info(self) -> (str, str, int, int):
+        # stage 3 安全问题风险分析 在目录范围内的具体某一页
+        risk_page_index = self.__locate_target_page(self.start_chapter)
+        # stage 4 在该页中，找到 安全问题风险分析 在哪个block
+        blocks = self.__get_blocks_by_page_index(risk_page_index)
+        risk_block_index = locate_target_block_index(blocks, self.start_chapter)
+        # stage 5 找到下一个章节的block
+        next_chapter_block_index = get_chapter_block_index(blocks, risk_block_index, self.end_chapter)
+        lineInfoList = []
+        for i in range(risk_block_index, next_chapter_block_index + 1):
+            block = blocks[i]
+            block_text = block[4]
+            chapter, title, page = get_outline_block_info(block_text)
+            lineInfoList.append(LineInfo(chapter, title, page))
+        nextLineInfo = get_next_line(lineInfoList)
+        # stage 6 找出开始，结束block对应的页码
+        riskLineInfo = lineInfoList[0]
+        risk_chapter, risk_title, risk_page = riskLineInfo.chapter, riskLineInfo.title,riskLineInfo.page
+        next_chapter, next_title, next_page = nextLineInfo.chapter, nextLineInfo.title, nextLineInfo.page
+        # stage 7 根据显示页码信息，给出对应的实际页码范围
+        actual_start_page = self.__get_actual_page(risk_page)
+        actual_end_page = self.__get_actual_page(next_page)
+        return risk_title,next_title, actual_start_page, actual_end_page
+
+
+def dir_test():
+    # 无水印 ok
+    base_dir = "../files/unmark"
+    # base_dir = "../files/mark"
+    for filename in os.listdir(base_dir):
+        pdf_path = os.path.join(base_dir, filename)
+        oh = OutlineHelper(pdf_path)
+        start_page = oh.start_page
+        end_page = oh.end_page
+        start_chapter = oh.start_chapter
+        end_chapter = oh.end_chapter
+        print(f"{filename} \n 起始页-结束页[{start_page} - {end_page}]")
+        print("-------------------")
+
+
+def single_test():
+    # ok
+    # pdf_path = "../files/unmark/5-1网络安全等级保护测评报告-实时监控.pdf"
+
+    # ok
+    # pdf_path = "../files/unmark/5-1网络安全等级保护测评报告调度管理.pdf"
+
+    # ok
+    # pdf_path = "../files/unmark/7-1 DB-2308-0028_天津市滨海新区金开新能源科技有限公司金开新能锦湖轮胎18MW分布式光伏电站监控_测评报告.pdf"
+
+    # ok
+    # pdf_path = "../files/unmark/7-1 DB-2401-0023_天津悦通达新能源科技有限公司110KV悦通达风电场电力监控系统_测评报告.pdf"
+
+    # ok
+    # pdf_path = "../files/unmark/DB-2003-0034_国网天津市电力公司滨海供电分公司调度自动化系统_测评报告.pdf"
+
+    # ok
+    # pdf_path = "../files/unmark/刘岗庄网络安全等级保护测评报告-.pdf"
+
+    # ok
+    # pdf_path = "../files/unmark/吴忠第五十光伏电站电力监控系统等级保护测评.pdf"
+
+    # ok
+    # pdf_path = "../files/unmark/国网银川供电公司银川智能电网调度控制系统等级测评报告-2024-Z.pdf"
+
+    # 不ok
+    # pdf_path = "../files/unmark/国能宁东新能源有限公司330千伏曙光变电力监控系统（S2A3）网络安全等级保护测评报告.pdf"
+
+    # ok
+    # pdf_path = "../files/unmark/青龙山第二储能电站电力监控系统等级测评报告.pdf"
+
+    pdf_path = r"C:\Users\Administrator\Desktop\报告识别\报告识别\02-问题列表篇幅太长识别失败\吴忠第三十五光伏电站电力监控系统测评报告(1).pdf"
+
+    oh = OutlineHelper(pdf_path)
+    start_page = oh.start_page
+    end_page = oh.end_page
+    print(f"起始页-结束页[{start_page} - {end_page}]")
+
+
+if __name__ == "__main__":
+    single_test()
+    # dir_test()

@@ -1,0 +1,9 @@
+PyMuPDF~=1.25.5
+fastapi~=0.109.0
+pdfplumber~=0.11.6
+uvicorn~=0.35.0
+httpx~=0.26.0
+python-multipart~=0.0.20
+starlette~=0.35.0
+PyYAML~=6.0.2
+uvicorn[standard]
