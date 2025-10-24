@@ -1,10 +1,11 @@
 import os
 from fastapi import UploadFile, File
-from server.tools.base import split_line,shorten_filename
+from server.tools.base import split_line, shorten_filename
 from server.protection_pdf_extract.outline_helper import OutlineHelper
 from server.protection_pdf_extract.table_helper import TableHelper
 from config.basic_config import BASE_TEMP_DIR
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -59,7 +60,7 @@ def extract_safe_split_table(pdf_path: str) -> list[list[str]]:
     table_list = extract_safe_table(pdf_path)
     if len(table_list) > 1:
         split_key = '关联资产'
-        split_char_list = ['、', '，']
+        split_char_list = ['、', '，', ',']
         return split_table(table_list, split_char_list, split_key)
     else:
         return table_list
@@ -262,29 +263,111 @@ def mark_test():
     print(res)
 
 
-def new_test():
+# 解决问题1
+def new_test1():
     # ok
-    pdf_path1 = r"D:\code\CSM-Service\files\报告识别\01-文件名称太长识别失败\T2024072303300001_国家电投集团宁夏能源铝业中卫新能源有限公司_国电投框架-宁夏-铝电公司中卫新能源香山第四风电场及沙洼110kV变电站监控系统第二级信息系统等级保护测评报告-出口复核-二次邮寄-1-V69297.pdf"
-
-    # ok
-    pdf_path2 = r"D:\code\CSM-Service\files\报告识别\02-问题列表篇幅太长识别失败\吴忠第三十五光伏电站电力监控系统测评报告(1).pdf"
+    pdf_path1 = r"D:\github\CSM-Service\file\01\SA-MI07-HT24031-CP24705_张易第一风电场电力监控系统_测评报告.pdf"
 
     # ok
-    pdf_path3 = r"D:\code\CSM-Service\files\报告识别\02-问题列表篇幅太长识别失败\吴忠第五十光伏电站电力监控系统等级保护测评 (2).pdf"
+    pdf_path2 = r"D:\github\CSM-Service\file\01\中卫第六十一光伏电站电力监控系统_测评报告 .pdf"
 
     # ok
-    pdf_path4 = r"D:\code\CSM-Service\files\报告识别\03-关联资产未拆分，分隔符为逗号\宁东曙光第一储能电站电力监控系统测评报告.pdf"
+    pdf_path3 = r"D:\github\CSM-Service\file\01\中宁县欣文新能源有限公司-中卫第六十四光伏电站电力监控系统等级测评报告.pdf"
 
     # ok
-    pdf_path5 = r"D:\code\CSM-Service\files\报告识别\03-关联资产未拆分，分隔符为逗号\宁东第七光伏电站监控系统测评报告(最终版) (1).pdf"
+    pdf_path4 = r"D:\github\CSM-Service\file\01\中宁第六十光伏电站测评报告终版2024.pdf"
 
-    # x
-    pdf_path6 = r"D:\code\CSM-Service\files\报告识别\04-报告识别失败（报告中关联资产换行区分）\2024年等保测评报告ITSTEC-A-XT-1902023-03-网络安全等级保护蒋家南第一风电场风机监控系统等级测评报告-定稿.pdf"
+    # ok
+    pdf_path5 = r"D:\github\CSM-Service\file\01\吴忠市瑞储科技有限公司-泉眼第三储能电站电力监控系统-等级测评报告.pdf"
 
-    table_list = extract_safe_split_table(pdf_path6)
-    res = output_standard(table_list)
-    print(res)
+    table_list = extract_safe_split_table(pdf_path5)
+    print(table_list[0])
+    for line in table_list[1:]:
+        print(line)
+
+
+# 解决问题2
+def new_test2():
+    # ok
+    pdf_path1 = r"D:\github\CSM-Service\file\02\中卫第四十七光伏电站电力监控系统_测评报告.pdf"
+
+    table_list = extract_safe_split_table(pdf_path1)
+    print(table_list[0])
+    for line in table_list[1:]:
+        print(line)
+
+
+# 解决问题3
+def new_test3():
+    # ok
+    pdf_path1 = r"D:\github\CSM-Service\file\03\向阳第一储能电站电力监控系统测评报告(盖章版) .pdf"
+
+    # ok
+    pdf_path2 = r"D:\github\CSM-Service\file\03\吴忠第五十光伏电站电力监控系统等级保护测评 (1).pdf"
+
+    # ok
+    pdf_path3 = r"D:\github\CSM-Service\file\03\星能第四风电场电力监控系统测评报告.pdf"
+
+    # ok
+    pdf_path4 = r"D:\github\CSM-Service\file\03\杨家窑第三风电场监控系统等保测评报告.pdf"
+
+    # ok
+    pdf_path5 = r"D:\github\CSM-Service\file\03\杨家窑第二风光电场电力监控系统等保测评报告.pdf"
+
+    # ok
+    pdf_path6 = r"D:\github\CSM-Service\file\03\电力监控系统测评报告-嘉泽第一风电场.pdf"
+
+    # ok
+    pdf_path7 = r"D:\github\CSM-Service\file\03\T2024072303250001_国家电投集团宁夏能源铝业中卫新能源有限公司_国电投框架-宁夏-铝电公司中卫新能源香山第六风电场及沙梁110kV变电站监控系统第三级信息系统等级保护测评报告-出口复核-二次邮寄-1-V69298 (1).pdf"
+
+
+    table_list = extract_safe_split_table(pdf_path7)
+    print(table_list[0])
+    for line in table_list[1:]:
+        print(line)
+
+
+
+# 解决问题4
+def new_test4():
+    # ok
+    pdf_path1 = r"D:\github\CSM-Service\file\04\XMBH2025050924+6001523 绿塬第一储能电站电力控制系统v1.0(3) (1).pdf"
+
+    table_list = extract_safe_split_table(pdf_path1)
+    print(table_list[0])
+    for line in table_list[1:]:
+        print(line)
+
+
+# 解决问题6
+def new_test6():
+    # ok
+    pdf_path1 = r"D:\github\CSM-Service\file\06\中铝宁夏能源集团马莲台发电分公司NCS变电站（S3A2）网络控制系统网络安全等级保护测评报告 - 盖章.pdf"
+
+    table_list = extract_safe_split_table(pdf_path1)
+    print(table_list[0])
+    for line in table_list[1:]:
+        print(line)
+
+# 解决问题8
+def new_test8():
+    # ok
+    pdf_path1 = r"D:\github\CSM-Service\file\08\银川第四光伏电站电力监控系统测评报告(2024).pdf"
+
+    table_list = extract_safe_table(pdf_path1)
+    print(table_list[0])
+    for line in table_list[1:]:
+        print(line)
+
+# 解决问题9
+def new_test9():
+    # ok
+    pdf_path1 = r"D:\github\CSM-Service\file\09\银阳电站电力监控子系统_测评报告（中卫第四十光伏电站）.pdf"
+
+    table_list = extract_safe_table(pdf_path1)
+    print(table_list[0])
+    for line in table_list[1:]:
+        print(line)
 
 if __name__ == '__main__':
-    mark_test()
-    # new_test()
+    new_test1()

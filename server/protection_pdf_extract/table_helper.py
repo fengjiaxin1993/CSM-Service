@@ -55,18 +55,40 @@ def get_upper_bbox(page_bbox, text_bbox):
     return page_x0, page_y0, page_x1, text_y0
 
 
+# 通过blocks判断是否含有倾斜文字水印
+def contain_mark(blocks):
+    for block in blocks:
+        type_info = block["type"]
+        if type_info != 0:  # 非文字block
+            continue
+        lines = block['lines']
+        for line in lines:
+            dir = line["dir"]
+            if dir[0] != 1.0 or dir[1] != 0.0:  # 去除倾斜方向的文字
+                return True
+    return False
+
+
+# 获取table数据，以列表的形式
+def get_table_data(table: pymupdf.table.Table, mark_flag: bool, blocks: list):
+    table_info = TableInfo(table, mark_flag, blocks)
+    return table_info.get_table()
+
+
 class TableHelper:
     def __init__(self, pdf_path, start_page, end_page, start_chapter, end_chapter):
         self.pdf_path = pdf_path
-        self.snap_tolerance = 6  # 先设置为6吧,目前看能较好处理 # 这个到时候需要不断判断,动态调整
+        self.snap_tolerance = 6  # 先设置为4吧,目前看能较好处理 # 这个到时候需要不断判断,动态调整
         self.start_page = start_page
         self.end_page = end_page  # 需要确定end_page是否包含表格，包含的表格是否和之前表格相同
         self.start_content = start_chapter
         self.end_content = end_chapter
+
         try:
             self.doc = pymupdf.open(self.pdf_path)
+            self.mark_flag = self.__contain_mark()
             first_table = self.__get_first_table()
-            first_table_data = self.__get_table_data(first_table, self.start_page)
+            first_table_data = get_table_data(first_table, self.mark_flag, self.__get_blocks(self.start_page))
             self.header_list = first_table_data[0]
             self.column_num = len(self.header_list)
             self.data_list = []
@@ -77,12 +99,15 @@ class TableHelper:
         finally:
             self.doc.close()
 
-    def __get_table_data(self, table: pymupdf.table.Table, page_num: int):
+    def __contain_mark(self):  # 判断是否包含水印
+        page = self.__get_page(self.start_page)
+        blocks = page.get_text("dict")['blocks']
+        return contain_mark(blocks)
+
+    def __get_blocks(self, page_num):
         page = self.__get_page(page_num)
         blocks = page.get_text("dict")['blocks']
-        table_info = TableInfo(table)
-        table_info.fill_info(blocks)
-        return table_info.get_table()
+        return blocks
 
     def __get_tables(self, page):
         page = self.doc.load_page(page - 1)
@@ -99,7 +124,7 @@ class TableHelper:
     # 确定范围截取内容
     def __get_tables_by_bbox(self, page: int, bbox: (float, float, float, float)):
         page = self.doc.load_page(page - 1)
-        tables = page.find_tables(clip=bbox, join_tolerance=10, snap_tolerance=self.snap_tolerance)
+        tables = page.find_tables(clip=bbox, join_tolerance=5, snap_tolerance=self.snap_tolerance)
         return tables.tables
 
     # 获取包含text内容的bbox四元组信息
@@ -147,7 +172,7 @@ class TableHelper:
         tables = self.__get_tables_by_bbox(self.end_page, target_bbox)
         if len(tables) != 0:
             table = tables[0]
-            table_data = self.__get_table_data(table, self.end_page)
+            table_data = get_table_data(table, self.mark_flag, self.__get_blocks(self.end_page))
             table_data = table_data[1:]
             for line_list in table_data:
                 clean_list(line_list)
@@ -156,22 +181,25 @@ class TableHelper:
     def __handle_pages(self):
         for page in range(self.start_page + 1, self.end_page):
             tables = self.__get_tables(page)
-            table = tables[0]
-            table_data = self.__get_table_data(table, page)
-            table_data = table_data[1:]
-            for line_list in table_data:
-                self.data_list.append(line_list)
+            if len(tables) == 0:
+                break
+            else:
+                table = tables[0]
+                table_data = get_table_data(table, self.mark_flag, self.__get_blocks(page))
+                table_data = table_data[1:]
+                for line_list in table_data:
+                    self.data_list.append(line_list)
 
-    # 根据每一行信息，合并跨页表格
+    # 根据每一行信息，合并跨页表格(需要判断跨页的表格)
     def __merge_info(self) -> list[list[str]]:
         res = []
         for line_list in self.data_list:
             if len(res) == 0:
                 res.append(line_list)
             else:
-                # 第一列
-                num = line_list[0]
-                if num:  # None 或者 '' 有问题编号
+                # 最后一列
+                risk_level = line_list[-1]
+                if risk_level:  # 有风险等级，说明是一行数据
                     if check_all_fill(line_list):  # 每列都有信息
                         res.append(line_list)
                     else:  # 有的列没有信息
@@ -179,8 +207,8 @@ class TableHelper:
                             if not line_list[col_idx]:
                                 line_list[col_idx] = res[-1][col_idx]
                         res.append(line_list)
-                else:  # None 或者 '' 没有问题编号
-                    for col_idx in range(1, self.column_num):
+                else:  # 没有风险等级，说明需要和上一行合并
+                    for col_idx in range(0, self.column_num - 1):
                         txt = line_list[col_idx]
                         if txt:
                             res[-1][col_idx] += txt
@@ -188,81 +216,11 @@ class TableHelper:
 
 
 if __name__ == "__main__":
-    # # ok
-    # pdf_path = "../files/DB-2003-0034_国网天津市电力公司滨海供电分公司调度自动化系统_测评报告.pdf"
-    # start_page = 144
-    # end_page = 175
-    # start_content = '安全问题风险分析'
-    # end_content = '等级测评结论'
 
-    # ok
-    # pdf_path = "../files/5-1网络安全等级保护测评报告调度管理.pdf"
-    # start_page = 91
-    # end_page = 93
-    # start_content = '安全问题风险分析'
-    # end_content = '等级测评结论'
-
-    # ok
-    # pdf_path = "../files/青龙山第二储能电站电力监控系统等级测评报告.pdf"
-    # start_page = 95
-    # end_page = 109
-    # start_content = '安全问题风险分析'
-    # end_content = '等级测评结论'
-
-    # ok
-    # pdf_path = "../files/吴忠第五十光伏电站电力监控系统等级保护测评.pdf"
-    # start_page = 146
-    # end_page = 182
-    # start_content = '安全问题风险分析'
-    # end_content = '总体评价'
-
-    # ok
-    # pdf_path = "../files/国网银川供电公司银川智能电网调度控制系统等级测评报告-2024-Z.pdf"
-    # start_page = 161
-    # end_page = 168
-    # start_content = '安全问题风险分析'
-    # end_content = '等级测评结论'
-
-    # ok
-    # pdf_path = "../files/国能宁东新能源有限公司330千伏曙光变电力监控系统（S2A3）网络安全等级保护测评报告.pdf"
-    # start_page = 103
-    # end_page = 113
-    # start_content = '安全问题风险分析'
-    # end_content = '等级测评结论'
-
-    # ok
-    # pdf_path = "../files/5-1网络安全等级保护测评报告-实时监控.pdf"
-    # start_page = 178
-    # end_page = 188
-    # start_content = '安全问题风险分析'
-    # end_content = '等级测评结论'
-
-    # ------------- 测试带水印的两个文件效果
-    # ok
-    # pdf_path = "../files/mark/等级测评报告-宁夏翔腾电源科技有限公司-江汉第二储能电站电力监控系统.pdf"
-    # start_page = 97
-    # end_page = 108
-    # start_content = '安全问题风险分析'
-    # end_content = '等级测评结论'
-
-    # ok
-    # pdf_path = "../files/mark/盖章版_等保_宁夏超高压-新一代集控站设备监控系统-终.pdf"
-    # start_page = 115
-    # end_page = 125
-    # start_content = '安全问题风险分析'
-    # end_content = '等级测评结论'
-
-    # ok
-    # pdf_path = "../files/mark/DB-2405-0051_国网天津市电力公司国网天津市电力公司智能电网调度技术支持系统实时监控与预警系统主备一体系统_测评报告.pdf"
-    # start_page = 128
-    # end_page = 146
-    # start_content = '安全问题风险分析'
-    # end_content = '等级测评结论'
-
-    # ok
-    pdf_path = r"D:\code\CSM-Service\files\mark\DB-2405-0051_国网天津市电力公司国网天津市电力公司智能电网调度技术支持系统实时监控与预警系统主备一体系统_测评报告.pdf"
-    start_page = 72
-    end_page = 73
+    #
+    pdf_path = r"D:\github\CSM-Service\file\09\银阳电站电力监控子系统_测评报告（中卫第四十光伏电站）.pdf"
+    start_page = 169
+    end_page = 180
     start_content = '安全问题风险分析'
     end_content = '等级测评结论'
 

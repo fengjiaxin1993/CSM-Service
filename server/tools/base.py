@@ -36,7 +36,7 @@ def is_same_list(a_list, b_list):
 
 
 # 将表格中关联资产进行分开
-def split_line(header_list, data_list, split_char_list : list= list['、', '，'], key='关联资产'):
+def split_line(header_list, data_list, split_char_list: list = list['、', '，'], key='关联资产'):
     column_num = len(header_list)
     column_idx = -1
     for idx in range(column_num):
@@ -48,14 +48,15 @@ def split_line(header_list, data_list, split_char_list : list= list['、', '，'
     split_data_list = []
     for lines in data_list:
         assets = lines[column_idx]  # 关联资产
-        asset_list = cut_list(assets,split_char_list)
+        asset_list = cut_list(assets, split_char_list)
         for asset in asset_list:
             copied_lines = lines[:]
             copied_lines[column_idx] = asset
             split_data_list.append(copied_lines)
     return split_data_list
 
-def cut_list(line,split_char_list : list= list['、', '，'])-> list[str]:
+
+def cut_list(line, split_char_list: list = list['、', '，']) -> list[str]:
     for char in split_char_list:
         lines = line.split(char)
         if len(lines) > 1:
@@ -92,16 +93,17 @@ def is_intersect(bbox1, bbox2):
         return False
     return True
 
+
 # 判断a_bbox是否包含 b_bbox
-def is_contain(a_bbox,b_bbox,thresold:int=15):
+def is_contain(a_bbox, b_bbox, thresold: int = 15):
     a_x0, a_y0, a_x1, a_y1 = a_bbox
     b_x0, b_y0, b_x1, b_y1 = b_bbox
-    if b_x0 + thresold >= a_x0 and b_y0 + thresold >= a_y0 and b_x1  <= a_x1 + thresold and b_y1 <= a_y1 + thresold:
+    if b_x0 + thresold >= a_x0 and b_y0 + thresold >= a_y0 and b_x1 <= a_x1 + thresold and b_y1 <= a_y1 + thresold:
         return True
     return False
 
 
-def area_percent(a_bbox, b_bbox): # 获取 a_bbox与b_bbox的交集面积/a_bbox
+def area_percent(a_bbox, b_bbox):  # 获取 a_bbox与b_bbox的交集面积/a_bbox
     a_x0, a_y0, a_x1, a_y1 = a_bbox
     b_x0, b_y0, b_x1, b_y1 = b_bbox
     # 完全没有交集
@@ -115,15 +117,14 @@ def area_percent(a_bbox, b_bbox): # 获取 a_bbox与b_bbox的交集面积/a_bbox
     a_area = (a_x1 - a_x0) * (a_y1 - a_y0)
     return intersect_area / a_area
 
+
 def clean(txt: str):
     x = txt.strip()
     return x.replace("\n", "")
 
 
-
-
-def shorten_filename(filename,limit=80):
+def shorten_filename(filename, limit=80):
     if len(filename) <= limit:
         return filename
     else:
-        return filename[:int(limit/2)-5] + '...' + filename[len(filename)-int(limit/2):]
+        return filename[:int(limit / 2) - 5] + '...' + filename[len(filename) - int(limit / 2):]

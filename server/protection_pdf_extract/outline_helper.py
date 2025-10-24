@@ -72,7 +72,7 @@ def is_main_text_footer(span) -> bool:
 
 # 判断是否是目录的章节标题
 def is_outline_chapter(span) -> bool:
-    if contain_key(span['text'], '目录') and 15.9 <= span['size'] <= 16.0:
+    if contain_key(span['text'], '目录') and 14.0 <= span['size'] <= 18.0:
         return True
     return False
 
@@ -112,6 +112,15 @@ def get_next_line(infoList: list[LineInfo]) -> LineInfo:
             return line
 
 
+# page种的block是否含有关键字
+def blocksContainKey(blocks, key):
+    spans = get_spans_by_blocks(blocks)
+    for span in spans:
+        if contain_key(span['text'], key):
+            return True
+    return False
+
+
 # pdf解析类帮助方法
 class OutlineHelper:
     def __init__(self, pdf_path, start_chapter="安全问题风险分析", end_chapter="等级测评结论"):
@@ -130,14 +139,17 @@ class OutlineHelper:
                 return
 
             self.total_page_num = self.doc.page_count
-
-            self.first_page = self.__get_first_page()  # 第一个显示正文的页码
-            if self.first_page == 0:
-                logger.error(f"【{self.file_name}】 无法找到正文，存取的pdf可能是扫描件，不支持!!!")
+            self.outline_start_page = self.__get_outline_start_page()
+            self.outline_end_page = self.__get_outline_end_page()
+            # debug
+            if self.outline_start_page == 0:
+                logger.error(
+                    f"【{self.file_name}】 无法读取目录页!!!!")
                 return
-            self.difference = self.first_page - 1  # 表示实际页数和显示页数的差距，例如显示第1页，在pdf中是第10页，difference=9
-            # 获取目录 的开始页、结束页 页码
-            self.outline_start_page, self.outline_end_page = self.__get_outline_start_page(), self.first_page - 1
+
+            show_page_num, actual_page_num = self.__get_show_info()
+            self.difference = actual_page_num - show_page_num  # 表示实际页数和显示页数的差距，例如显示第1页，在pdf中是第10页，difference=9
+
             self.start_chapter, self.end_chapter, self.start_page, self.end_page = self.__get_target_page_info()
             logger.info(
                 f"【{self.file_name}】的解析信息如下:\n【目录页信息】 开始页:{self.outline_start_page}\t结束页:{self.outline_end_page}\n"
@@ -150,30 +162,55 @@ class OutlineHelper:
         return self.difference + show_page_num
 
     def is_valid(self):
-        if self.first_page == 0 or self.start_page == 0 or self.end_page == 0:
+        if self.start_page == 0 or self.end_page == 0:
             return False
         return True
 
-    # 获取正文 第一页对应的实际页码
-    def __get_first_page(self):
-        for index in range(int(0.2* self.total_page_num)):
-            blocks = self.__get_origin_blocks_by_page_index(index)
-            spans = get_spans_by_blocks(blocks)
-            for span in spans:
-                if is_main_text_footer(span):
-                    return index + 1
-        return 0
+    # 找出(显示第几页，实际第几页)
+    def __get_show_info(self) -> (int, int):
+        page = self.doc.load_page(self.outline_end_page)  # 目录结束后的第一页
+        text = page.get_text("text")
+        pattern = r"第(\d+)页"
+
+        replace_text = text.replace(" ", "")
+        lines = replace_text.split("\n")
+        for line in lines:
+            match = re.search(pattern, line)
+            if match:
+                return int(match.group(1)), self.outline_end_page + 1
+            else:
+                continue
+        return 1, self.outline_end_page + 1  # 找不到的话，默认是第一页
+
+        # for index in range(int(0.5 * self.total_page_num)):
+        #     blocks = self.__get_origin_blocks_by_page_index(index)
+        #     spans = get_spans_by_blocks(blocks)
+        #     for span in spans:
+        #         if is_main_text_footer(span):
+        #             return index + 1
+        # return 0
 
     # 思路: 第一页目录包含三个目录关键字
     # 返回目录起始页
     def __get_outline_start_page(self) -> int:
-        for page_index in range(self.first_page):
+        for page_index in range(int(0.5 * self.total_page_num)):
             blocks = self.__get_origin_blocks_by_page_index(page_index)
             spans = get_spans_by_blocks(blocks)
             for span in spans:
                 if is_outline_chapter(span):
                     return page_index + 1
         return 0
+
+    # 思路: 从找到的目录页开始遍历,直到第一个不含目录的页数
+    # 返回目录结束页
+    def __get_outline_end_page(self) -> int:
+        for page_index in range(self.outline_start_page, self.outline_start_page + 200):  # 目录200页怎么也够了
+            blocks = self.__get_origin_blocks_by_page_index(page_index)
+            contain_flag = blocksContainKey(blocks, "目录")
+            if contain_flag:
+                continue
+            else:
+                return page_index
 
     # 获取更详细的block文字信息
     # 去除倾斜的水印信息
@@ -244,12 +281,12 @@ class OutlineHelper:
         nextLineInfo = get_next_line(lineInfoList)
         # stage 6 找出开始，结束block对应的页码
         riskLineInfo = lineInfoList[0]
-        risk_chapter, risk_title, risk_page = riskLineInfo.chapter, riskLineInfo.title,riskLineInfo.page
+        risk_chapter, risk_title, risk_page = riskLineInfo.chapter, riskLineInfo.title, riskLineInfo.page
         next_chapter, next_title, next_page = nextLineInfo.chapter, nextLineInfo.title, nextLineInfo.page
         # stage 7 根据显示页码信息，给出对应的实际页码范围
         actual_start_page = self.__get_actual_page(risk_page)
         actual_end_page = self.__get_actual_page(next_page)
-        return risk_title,next_title, actual_start_page, actual_end_page
+        return risk_title, next_title, actual_start_page, actual_end_page
 
 
 def dir_test():
@@ -268,42 +305,12 @@ def dir_test():
 
 
 def single_test():
-    # ok
-    # pdf_path = "../files/unmark/5-1网络安全等级保护测评报告-实时监控.pdf"
 
-    # ok
-    # pdf_path = "../files/unmark/5-1网络安全等级保护测评报告调度管理.pdf"
-
-    # ok
-    # pdf_path = "../files/unmark/7-1 DB-2308-0028_天津市滨海新区金开新能源科技有限公司金开新能锦湖轮胎18MW分布式光伏电站监控_测评报告.pdf"
-
-    # ok
-    # pdf_path = "../files/unmark/7-1 DB-2401-0023_天津悦通达新能源科技有限公司110KV悦通达风电场电力监控系统_测评报告.pdf"
-
-    # ok
-    # pdf_path = "../files/unmark/DB-2003-0034_国网天津市电力公司滨海供电分公司调度自动化系统_测评报告.pdf"
-
-    # ok
-    # pdf_path = "../files/unmark/刘岗庄网络安全等级保护测评报告-.pdf"
-
-    # ok
-    # pdf_path = "../files/unmark/吴忠第五十光伏电站电力监控系统等级保护测评.pdf"
-
-    # ok
-    # pdf_path = "../files/unmark/国网银川供电公司银川智能电网调度控制系统等级测评报告-2024-Z.pdf"
-
-    # 不ok
-    # pdf_path = "../files/unmark/国能宁东新能源有限公司330千伏曙光变电力监控系统（S2A3）网络安全等级保护测评报告.pdf"
-
-    # ok
-    # pdf_path = "../files/unmark/青龙山第二储能电站电力监控系统等级测评报告.pdf"
-
-    pdf_path = r"C:\Users\Administrator\Desktop\报告识别\报告识别\02-问题列表篇幅太长识别失败\吴忠第三十五光伏电站电力监控系统测评报告(1).pdf"
+    pdf_path = r"D:\github\CSM-Service\file\01\SA-MI07-HT24031-CP24705_张易第一风电场电力监控系统_测评报告.pdf"
 
     oh = OutlineHelper(pdf_path)
-    start_page = oh.start_page
-    end_page = oh.end_page
-    print(f"起始页-结束页[{start_page} - {end_page}]")
+    print(f"起始页-结束页[{oh.start_page} - {oh.end_page}]")
+    print(f"起始章节-结束章节[{oh.start_chapter} - {oh.end_chapter}]")
 
 
 if __name__ == "__main__":
