@@ -78,7 +78,7 @@ def get_table_data(table: pymupdf.table.Table, mark_flag: bool, blocks: list):
 class TableHelper:
     def __init__(self, pdf_path, start_page, end_page, start_chapter, end_chapter):
         self.pdf_path = pdf_path
-        self.snap_tolerance = 6  # 先设置为4吧,目前看能较好处理 # 这个到时候需要不断判断,动态调整
+        self.snap_tolerance = 6  # 先设置为4吧,目前看能较好处理 # 这个到时候需要不断判断,动态调整, 这个后续使用默认的
         self.start_page = start_page
         self.end_page = end_page  # 需要确定end_page是否包含表格，包含的表格是否和之前表格相同
         self.start_content = start_chapter
@@ -111,7 +111,8 @@ class TableHelper:
 
     def __get_tables(self, page):
         page = self.doc.load_page(page - 1)
-        tables = page.find_tables(join_tolerance=10, snap_tolerance=self.snap_tolerance)
+        # tables = page.find_tables(join_tolerance=10, snap_tolerance=self.snap_tolerance)
+        tables = page.find_tables()
         return tables.tables
 
     def __get_page(self, page):
@@ -124,7 +125,8 @@ class TableHelper:
     # 确定范围截取内容
     def __get_tables_by_bbox(self, page: int, bbox: (float, float, float, float)):
         page = self.doc.load_page(page - 1)
-        tables = page.find_tables(clip=bbox, join_tolerance=5, snap_tolerance=self.snap_tolerance)
+        # tables = page.find_tables(clip=bbox, join_tolerance=5, snap_tolerance=self.snap_tolerance)
+        tables = page.find_tables(clip=bbox)
         return tables.tables
 
     # 获取包含text内容的bbox四元组信息
