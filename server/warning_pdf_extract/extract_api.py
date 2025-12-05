@@ -16,7 +16,8 @@ empty_dic = {
     "influence": "",
     "check": "",
     "repair": "",
-    "requirement": ""
+    "requirement": "",
+    "cve_code":""
 }
 
 

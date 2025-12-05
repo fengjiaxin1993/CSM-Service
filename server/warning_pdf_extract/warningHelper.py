@@ -99,6 +99,19 @@ def get_warning_level_int(war: str) -> int:
         return 0
 
 
+# CVE-2024-21733 / SGVD202510003
+# cve编号格式如上
+def extract_cve_code(txt: str) -> str:
+    cve_pattern = re.compile(r'CVE-\d{4}-\d+')  # 匹配CVE格式
+    sgvd_pattern = re.compile(r'SGVD\d{4}\d+')  # 匹配SGVD格式
+
+    # 提取匹配结果
+    cve_list = cve_pattern.findall(txt)
+    sgvd_list = sgvd_pattern.findall(txt)
+    cve_list.extend(sgvd_list)
+    return ",".join(cve_list)
+
+
 class WarningHelper:
     def __init__(self, path: str):
         self.path = path
@@ -130,22 +143,14 @@ class WarningHelper:
 
     def get_text(self):
         text_list = []
-        ignore_flag = False  # 包含漏洞信息如下
         for span in self.span_list:
             text = span['text']
             text = text_strip(text)
-            if contain_key(text, "漏洞信息如下"):
-                ignore_flag = True
-                continue
-            elif contain_key(text, "影响范围"):
-                ignore_flag = False
-                text_list.append(text)
             if contain_key(text, "联系人"):
-                ignore_flag = True
+                break
             else:
-                if not ignore_flag:
-                    nor_text = self.normalize_text(text)
-                    text_list.append(nor_text)
+                nor_text = self.normalize_text(text)
+                text_list.append(nor_text)
         return "\n".join(text_list)
 
     def normalize_text(self, text):  # 对文本归一化
@@ -169,10 +174,20 @@ class WarningHelper:
         end_content = "通知范围"
         return text_strip(get_middle_text(self.text, start_content, end_content))
 
+    def __extract_cve_code(self):  # 提取 风险描述
+        start_content = "风险描述\n"
+        end_content = "影响范围\n"
+        risk_desc = get_middle_text(self.text, start_content, end_content)
+        return extract_cve_code(risk_desc)
+
     def __extract_desc(self):  # 提取 风险描述
         start_content = "风险描述\n"
         end_content = "影响范围\n"
-        return text_strip(get_middle_text(self.text, start_content, end_content))
+        risk_desc = get_middle_text(self.text, start_content, end_content)
+        # 如果包含
+        if contain_key(risk_desc,"漏洞信息如下"):
+            risk_desc = get_middle_text(risk_desc, start_content, "漏洞信息如下")
+        return text_strip(risk_desc)
 
     def __extract_influence(self):  # 提取 影响范围
         start_content = "影响范围\n"
@@ -204,23 +219,34 @@ class WarningHelper:
         dic["check"] = self.__extract_check()
         dic["repair"] = self.__extract_repair()
         dic["requirement"] = self.__extract_requirement()
+        dic["cve_code"] = self.__extract_cve_code()
         return dic
 
 
 if __name__ == "__main__":
     # path1 ok
-    path1 = r"D:\code\extractFromPdf\yujing\预警-WAYJ202502003L2.pdf"
+    path1 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\预警-WAYJ202502003L2.pdf"
     # path2 ok
-    path2 = r"D:\code\extractFromPdf\yujing\预警-WAYJ202503006L3.pdf"
+    path2 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\预警-WAYJ202503006L3.pdf"
     # path3 ok
-    path3 = r"D:\code\extractFromPdf\yujing\预警-WAYJ202505009L3.pdf"
+    path3 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\预警-WAYJ202505009L3.pdf"
     # path4 ok
-    path4 = r"D:\code\extractFromPdf\yujing\预警-WAYJ202505010L3.pdf"
+    path4 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\预警-WAYJ202505010L3.pdf"
     # path5 ok
-    path5 = r"D:\code\extractFromPdf\yujing\WAYJ202507013L2银河麒麟、达梦等国产操作系统和数据库漏洞预警.pdf"
+    path5 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\WAYJ202507013L2银河麒麟、达梦等国产操作系统和数据库漏洞预警.pdf"
     # path6 ok
-    path6 = r"D:\code\extractFromPdf\yujing\WAYJ202506011L221银河麒麟、统信、中科方德操作系统和虚谷数据库漏洞预警.pdf"
-    wh = WarningHelper(path6)
-    print(wh.text)
+    path6 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\WAYJ202506011L221银河麒麟、统信、中科方德操作系统和虚谷数据库漏洞预警.pdf"
+    # ok
+    path7 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\WAYJ202512018L1.pdf"
+    # ok
+    path8 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\预警-WAYJ202502003L2.pdf"
+    # ok
+    path9 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\预警-WAYJ202503006L3.pdf"
+    # ok
+    path10 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\预警-WAYJ202505009L3.pdf"
+    # ok
+    path11 = r"D:\工作\科东\CSM\csm本地安装\表格提取csm服务\文件识别\预警单\预警-WAYJ202505010L3.pdf"
+    wh = WarningHelper(path11)
     dic = wh.extract_info()
-    print(dic)
+    for k,v in dic.items():
+        print(f"{k}: {v}")
