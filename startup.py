@@ -1,14 +1,10 @@
-import logging
-import logging.config
-import sys
-import os
 import yaml
 import uvicorn
 from server.api_server.server_app import create_app
 
 
-def run_api_server(host: str, port: int, open_cross_domain: bool, version: str):
-    app = create_app(open_cross_domain, version)
+def run_api_server(host: str, port: int, open_cross_domain: bool, debug:bool):
+    app = create_app(open_cross_domain, debug)
     uvicorn.run(app, host=host, port=port)
 
 
@@ -23,7 +19,7 @@ if __name__ == "__main__":
     server_dict = config_dict['server']
     host = server_dict['host']
     port = server_dict['port']
-    version = config_dict['version']
     open_cross_domain = config_dict['open_cross_domain']
+    debug = config_dict['debug']
 
-    run_api_server(host, port, open_cross_domain, version)
+    run_api_server(host, port, open_cross_domain, debug)
