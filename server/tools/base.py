@@ -1,5 +1,15 @@
+import hashlib
 import math
+import os
 import re
+from typing import LiteralString
+
+from fastapi import UploadFile
+
+from config.basic_config import BASE_TEMP_DIR
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # 字符串匹配，判断text中是否包含keyword
@@ -123,8 +133,19 @@ def clean(txt: str):
     return x.replace("\n", "")
 
 
-def shorten_filename(filename, limit=80):
-    if len(filename) <= limit:
-        return filename
-    else:
-        return filename[:int(limit / 2) - 5] + '...' + filename[len(filename) - int(limit / 2):]
+def compute_str_md5(name: str) -> str:
+    md5 = hashlib.md5()
+    md5.update(name.encode('utf-8'))
+    return md5.hexdigest()
+
+
+# 保存，返回临时路径
+def save_to_temp_file(file: UploadFile) -> str:
+    file_content = file.file.read()  # 读取上传文件的内容
+    prefix, suffix = file.filename.split(".")
+    new_file_prefix = compute_str_md5(prefix)
+    new_file_name = new_file_prefix + "." + suffix
+    new_file_path = os.path.join(BASE_TEMP_DIR, new_file_name)
+    with open(new_file_path, "wb") as f:
+        f.write(file_content)
+    return new_file_path

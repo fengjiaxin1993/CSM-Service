@@ -1,8 +1,5 @@
-import os
 from fastapi import UploadFile, File
-
-from config.basic_config import BASE_TEMP_DIR
-from server.tools.base import shorten_filename
+from server.tools.base import save_to_temp_file
 from server.warning_pdf_extract.warningHelper import WarningHelper
 import logging
 
@@ -36,12 +33,8 @@ def upload_extract_warning_info(
     将文件保存到文件目录.
     """
     try:
-        file_content = file.file.read()  # 读取上传文件的内容
-        short_filename = shorten_filename(file.filename)
-        new_file_path = os.path.join(BASE_TEMP_DIR, short_filename)
-        logger.info(f"{file.filename} 文件保存成功!")
-        with open(new_file_path, "wb") as f:
-            f.write(file_content)
+        new_file_path = save_to_temp_file(file)
+        logger.info(f"{file.filename} 文件保存成功!，保存到{new_file_path}")
         wh = WarningHelper(new_file_path)
         res_dic = wh.extract_info()
         return res_dic

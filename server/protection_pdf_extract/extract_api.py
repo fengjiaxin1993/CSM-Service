@@ -1,9 +1,7 @@
-import os
 from fastapi import UploadFile, File
-from server.tools.base import split_line, shorten_filename
+from server.tools.base import split_line, save_to_temp_file
 from server.protection_pdf_extract.outline_helper import OutlineHelper
 from server.protection_pdf_extract.table_helper import TableHelper
-from config.basic_config import BASE_TEMP_DIR
 import logging
 
 logger = logging.getLogger(__name__)
@@ -74,13 +72,8 @@ def upload_extract_safe_table(
     找到安全问题风险分析的表格，解决跨页问题，提取出原始表格。
     """
     try:
-
-        file_content = file.file.read()  # 读取上传文件的内容
-        short_filename = shorten_filename(file.filename)
-        new_file_path = os.path.join(BASE_TEMP_DIR, short_filename)
-        with open(new_file_path, "wb") as f:
-            f.write(file_content)
-        logger.info(f"{file.filename} 文件保存成功!")
+        new_file_path = save_to_temp_file(file)
+        logger.info(f"【{file.filename}】 save success ，save to 【{new_file_path}】")
         table_list = extract_safe_table(new_file_path)
         res = output_standard(table_list)
         return res
@@ -98,13 +91,8 @@ def upload_extract_safe_split_table(
         找到安全问题风险分析的表格，解决跨页问题，提取出原始表格后，对表格列（关联资产）进行划分，形成更详细的表格,json格式返回
         """
     try:
-
-        file_content = file.file.read()  # 读取上传文件的内容
-        short_filename = shorten_filename(file.filename)
-        new_file_path = os.path.join(BASE_TEMP_DIR, short_filename)
-        with open(new_file_path, "wb") as f:
-            f.write(file_content)
-        logger.info(f"【{short_filename}】 文件保存成功!")
+        new_file_path = save_to_temp_file(file)
+        logger.info(f"【{file.filename}】 save success ，save to 【{new_file_path}】")
         table_list = extract_safe_split_table(new_file_path)
         res = output_standard(table_list)
         return res
