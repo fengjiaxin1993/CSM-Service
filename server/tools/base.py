@@ -142,7 +142,7 @@ def compute_str_md5(name: str) -> str:
 # 保存，返回临时路径
 def save_to_temp_file(file: UploadFile) -> str:
     file_content = file.file.read()  # 读取上传文件的内容
-    prefix, suffix = file.filename.split(".")
+    prefix, suffix = os.path.splitext(file.filename)
     new_file_prefix = compute_str_md5(prefix)
     new_file_name = new_file_prefix + "." + suffix
     new_file_path = os.path.join(BASE_TEMP_DIR, new_file_name)
