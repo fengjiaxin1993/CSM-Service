@@ -7,17 +7,12 @@ from server.protection_pdf_extract.table_info import TableInfo
 # 安全通用要求这一行是多列合并，需要删除
 # 安全通用在表头下面
 def need_drop(line_list) -> bool:
-    length = len(line_list)
-    empty_num = 0
-    str_flag = False
     for line in line_list:
-        if line == '':
-            empty_num += 1
-        elif contain_key(line, '安全通用要求'):
-            str_flag = True
-    if empty_num == length - 1 and str_flag:
-        return True
+        if line:
+            if contain_key(line, '安全通用要求'):
+                return True
     return False
+
 
 
 def clean_list(arr: list[str]):
@@ -76,9 +71,9 @@ def get_table_data(table: pymupdf.table.Table, mark_flag: bool, blocks: list):
 
 
 class TableHelper:
-    def __init__(self, pdf_path, start_page, end_page, start_chapter, end_chapter):
+    def __init__(self, pdf_path, start_page, end_page, start_chapter, end_chapter, snap_tolerance=6):
         self.pdf_path = pdf_path
-        self.snap_tolerance = 6  # 先设置为4吧,目前看能较好处理 # 这个到时候需要不断判断,动态调整, 这个后续使用默认的
+        self.snap_tolerance = snap_tolerance  # 大多数用6适配没问题, 只有极个别必须用4 中卫第四十七光伏电站电力监控系统_测评报告.pdf
         self.start_page = start_page
         self.end_page = end_page  # 需要确定end_page是否包含表格，包含的表格是否和之前表格相同
         self.start_content = start_chapter
@@ -86,7 +81,7 @@ class TableHelper:
 
         try:
             self.doc = pymupdf.open(self.pdf_path)
-            self.mark_flag = self.__contain_mark()
+            self.mark_flag = self.__contain_mark() # 默认为True试试
             first_table = self.__get_first_table()
             first_table_data = get_table_data(first_table, self.mark_flag, self.__get_blocks(self.start_page))
             self.header_list = first_table_data[0]
@@ -111,8 +106,8 @@ class TableHelper:
 
     def __get_tables(self, page):
         page = self.doc.load_page(page - 1)
-        # tables = page.find_tables(join_tolerance=10, snap_tolerance=self.snap_tolerance)
-        tables = page.find_tables()
+        tables = page.find_tables(join_tolerance=8, snap_tolerance=self.snap_tolerance)
+        # tables = page.find_tables()
         return tables.tables
 
     def __get_page(self, page):
@@ -125,8 +120,8 @@ class TableHelper:
     # 确定范围截取内容
     def __get_tables_by_bbox(self, page: int, bbox: (float, float, float, float)):
         page = self.doc.load_page(page - 1)
-        # tables = page.find_tables(clip=bbox, join_tolerance=5, snap_tolerance=self.snap_tolerance)
-        tables = page.find_tables(clip=bbox)
+        tables = page.find_tables(clip=bbox, join_tolerance=8, snap_tolerance=self.snap_tolerance)
+        # tables = page.find_tables(clip=bbox)
         return tables.tables
 
     # 获取包含text内容的bbox四元组信息
@@ -191,6 +186,7 @@ class TableHelper:
                 table_data = table_data[1:]
                 for line_list in table_data:
                     self.data_list.append(line_list)
+
 
     # 根据每一行信息，合并跨页表格(需要判断跨页的表格)
     def __merge_info(self) -> list[list[str]]:

@@ -8,7 +8,6 @@ from fastapi import UploadFile
 
 from config.basic_config import BASE_TEMP_DIR
 import logging
-
 logger = logging.getLogger(__name__)
 
 
@@ -149,3 +148,4 @@ def save_to_temp_file(file: UploadFile) -> str:
     with open(new_file_path, "wb") as f:
         f.write(file_content)
     return new_file_path
+

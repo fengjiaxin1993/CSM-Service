@@ -65,7 +65,8 @@ def get_match_num(blocks, key):
 
 # 根据span, 判断是否是页脚的正文
 def is_main_text_footer(span) -> bool:
-    if contain_key(span['text'], '正文') and span['size'] == 9.0:
+    # if contain_key(span['text'], '正文') and span['size'] == 9.0:
+    if contain_key(span['text'], '正文'):
         return True
     return False
 
@@ -167,19 +168,21 @@ class OutlineHelper:
         return True
 
     # 找出(显示第几页，实际第几页)
+    # 有些文档正文不是从第一页开始,例如 SA-MI07-HT24031-CP24705_张易第一风电场电力监控系统_测评报告.pdf
     def __get_show_info(self) -> (int, int):
-        page = self.doc.load_page(self.outline_end_page)  # 目录结束后的第一页
-        text = page.get_text("text")
-        pattern = r"第(\d+)页"
+        for index in range(self.outline_end_page, min(self.outline_end_page + 40, self.total_page_num - 1)): # 目录结束后最多找40页
+            page = self.doc.load_page(index)  # 目录结束后的第一页
+            text = page.get_text("text")
+            pattern = r"第(\d+)页"
 
-        replace_text = text.replace(" ", "")
-        lines = replace_text.split("\n")
-        for line in lines:
-            match = re.search(pattern, line)
-            if match:
-                return int(match.group(1)), self.outline_end_page + 1
-            else:
-                continue
+            replace_text = text.replace(" ", "")
+            lines = replace_text.split("\n")
+            for line in lines:
+                match = re.search(pattern, line)
+                if match:
+                    return int(match.group(1)), index + 1
+                else:
+                    continue
         return 1, self.outline_end_page + 1  # 找不到的话，默认是第一页
 
         # for index in range(int(0.5 * self.total_page_num)):

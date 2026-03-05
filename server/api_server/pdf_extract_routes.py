@@ -10,6 +10,7 @@ pdf_extract_router.post(
     summary="上传文件后，提取安全问题风险分析对应的表格",
 )(upload_extract_safe_table)
 
+
 # 上传文件后，提取安全问题风险分析表格后，对关联资产列进行split
 pdf_extract_router.post(
     "/extract_safe_split_table",
