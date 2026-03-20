@@ -3,7 +3,7 @@ import uvicorn
 from server.api_server.server_app import create_app
 
 
-def run_api_server(host: str, port: int, open_cross_domain: bool, debug:bool):
+def run_api_server(host: str, port: int, open_cross_domain: bool, debug: bool):
     app = create_app(open_cross_domain, debug)
     uvicorn.run(app, host=host, port=port)
 

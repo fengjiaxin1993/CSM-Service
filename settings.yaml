@@ -4,4 +4,4 @@ server:
 
 open_cross_domain: true
 
-debug: false
+debug: true

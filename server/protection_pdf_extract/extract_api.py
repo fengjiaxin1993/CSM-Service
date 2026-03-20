@@ -1,23 +1,12 @@
 from typing import List
 
 from fastapi import UploadFile, File
-from server.tools.base import split_line, save_to_temp_file
+from server.tools.base import split_line, save_to_temp_file, remove_dup_str
 from server.protection_pdf_extract.outline_helper import OutlineHelper
 from server.protection_pdf_extract.table_helper import TableHelper
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-# 从目录中找出 安全问题风险分析 这一章节和下一章节对应的页码
-def get_outline_info(
-        pdf_path: str,
-        start_chapter: str = '安全问题风险分析') -> dict:
-    oh = OutlineHelper(pdf_path=pdf_path, keyword=start_chapter)
-    return {"start_page": oh.start_page,
-            "end_page": oh.end_page,
-            "start_chapter": oh.start_content,
-            "end_chapter": oh.end_content}
 
 
 # 抽取表格,返回表格，第一行是表头
@@ -26,9 +15,8 @@ def extract_table(
         start_page: int,
         end_page: int,
         start_chapter: str,
-        end_chapter: str,
-        snap_tolerance: int) -> list[list[str]]:
-    th = TableHelper(pdf_path, start_page, end_page, start_chapter, end_chapter, snap_tolerance)
+        end_chapter: str) -> list[list[str]]:
+    th = TableHelper(pdf_path, start_page, end_page, start_chapter, end_chapter)
     table_list = [th.header_list]
     for line in th.merge_table:
         table_list.append(line)
@@ -36,35 +24,35 @@ def extract_table(
 
 
 # 将提取的表格修改后，逐项提出，将关联资产划分
-def split_table(
-        table_list: list[list[str]],
-        split_char_list: list = list['、', '，'],
-        key: str = '关联资产') -> list[list[str]]:
-    header_list = table_list[0]
-    data_list = table_list[1:]
-    split_data_list = split_line(header_list, data_list, split_char_list, key)
-    res_table_list = [header_list]
-    for line in split_data_list:
-        res_table_list.append(line)
-    return res_table_list
+# def split_table(
+#         table_list: list[list[str]],
+#         split_char_list: list = list['、', '，'],
+#         key: str = '关联资产') -> list[list[str]]:
+#     header_list = table_list[0]
+#     data_list = table_list[1:]
+#     split_data_list = split_line(header_list, data_list, split_char_list, key)
+#     res_table_list = [header_list]
+#     for line in split_data_list:
+#         res_table_list.append(line)
+#     return res_table_list
 
 
-def extract_safe_table(pdf_path: str, snap_tolerance=6) -> list[list[str]]:
+def extract_safe_table(pdf_path: str) -> list[list[str]]:
     oh = OutlineHelper(pdf_path=pdf_path)
     if oh.is_valid():
-        return extract_table(pdf_path, oh.start_page, oh.end_page, oh.start_chapter, oh.end_chapter,snap_tolerance)
+        return extract_table(pdf_path, oh.start_page, oh.end_page, oh.start_chapter, oh.end_chapter)
     else:
         return empty_table_list
 
 
-def extract_safe_split_table(pdf_path: str) -> list[list[str]]:
-    table_list = extract_safe_table(pdf_path)
-    if len(table_list) > 1:
-        split_key = '关联资产'
-        split_char_list = ['、', '，', ',']
-        return split_table(table_list, split_char_list, split_key)
-    else:
-        return table_list
+# def extract_safe_split_table(pdf_path: str) -> list[list[str]]:
+#     table_list = extract_safe_table(pdf_path)
+#     if len(table_list) > 1:
+#         split_key = '关联资产'
+#         split_char_list = ['、', '，', ',']
+#         return split_table(table_list, split_char_list, split_key)
+#     else:
+#         return table_list
 
 
 def upload_extract_safe_table(
@@ -78,41 +66,32 @@ def upload_extract_safe_table(
     try:
         new_file_path = save_to_temp_file(file)
         logger.info(f"【{file.filename}】 save success ，save to 【{new_file_path}】")
-        table_list = extract_safe_table(new_file_path,snap_tolerance=6)
+        table_list = extract_safe_table(new_file_path)
         res = output_standard(table_list)
-        if output_is_valid(res):
-            return res
-        else:
-            # 再试一次snap = 4
-            table_list = extract_safe_table(new_file_path,snap_tolerance=4)
-            new_res = output_standard(table_list)
-            if output_is_valid(new_res):
-                return new_res
-            else:
-                return res
+        return res
     except Exception as e:
         msg = f"{file.filename} 文件解析失败，报错信息为: {e}"
         logger.error(msg)
         return [empty_return_dic]
 
 
-def upload_extract_safe_split_table(
-        file: UploadFile = File(..., description="上传文件"),
-) -> list[dict]:
-    """
-        将文件保存到临时目录.
-        找到安全问题风险分析的表格，解决跨页问题，提取出原始表格后，对表格列（关联资产）进行划分，形成更详细的表格,json格式返回
-        """
-    try:
-        new_file_path = save_to_temp_file(file)
-        logger.info(f"【{file.filename}】 save success ，save to 【{new_file_path}】")
-        table_list = extract_safe_split_table(new_file_path)
-        res = output_standard(table_list)
-        return res
-    except Exception as e:
-        msg = f"解析{file.filename} 失败，报错信息为: {e}"
-        logger.error(msg)
-        return [empty_return_dic]
+# def upload_extract_safe_split_table(
+#         file: UploadFile = File(..., description="上传文件"),
+# ) -> list[dict]:
+#     """
+#         将文件保存到临时目录.
+#         找到安全问题风险分析的表格，解决跨页问题，提取出原始表格后，对表格列（关联资产）进行划分，形成更详细的表格,json格式返回
+#         """
+#     try:
+#         new_file_path = save_to_temp_file(file)
+#         logger.info(f"【{file.filename}】 save success ，save to 【{new_file_path}】")
+#         table_list = extract_safe_split_table(new_file_path)
+#         res = output_standard(table_list)
+#         return res
+#     except Exception as e:
+#         msg = f"解析{file.filename} 失败，报错信息为: {e}"
+#         logger.error(msg)
+#         return [empty_return_dic]
 
 
 def remove_digit_str(str):
@@ -123,7 +102,7 @@ standard_column_names = ["问题描述", "风险等级", "安全类型", "关联
 match_dict = {
     "content": ["安全问题", "问题描述"],
     "riskLevel": ["风险等级"],
-    "securityType": ["安全类", "安全类型"],
+    "securityType": ["安全类", "安全类型", "安全层面"],
     "evaluationObject": ["关联资产"]
 }
 empty_return_dic = {
@@ -146,7 +125,13 @@ securityType_dic = {
     "安全管理制度": 7,
     "安全管理机构": 8,
     "安全管理人员": 9,
-    "安全建设管理": 10
+    "安全建设管理": 10,
+    "总体安全": 11,
+    "物理安全": 12,
+    "网络安全": 13,
+    "主机安全": 14,
+    "应用安全": 15,
+    "管理安全": 16,
 }
 
 #风险等级 对应的编码
@@ -162,6 +147,7 @@ def get_risk_code(risk_info: str) -> int:
 
 
 def get_securityType_code(security_info: str) -> int:
+    security_info = remove_dup_str(security_info)
     return securityType_dic.get(security_info, 0)
 
 
@@ -189,6 +175,14 @@ def line2dic(header_list: list[str], data_list: list[str]) -> dict:
     return dic
 
 
+def is_same_dict(dic1, dic2):
+    for k, v in dic1.items():
+        if k not in dic2:
+            return False
+        if v != dic2[k]:
+            return False
+    return True
+
 def output_standard(table_list: list[list[str]]) -> list[dict]:
     if len(table_list) <= 1:
         return [empty_return_dic]
@@ -196,7 +190,11 @@ def output_standard(table_list: list[list[str]]) -> list[dict]:
         res = []
         header_list = table_list[0]
         for data_list in table_list[1:]:
-            res.append(line2dic(header_list, data_list))
+            dic = line2dic(header_list, data_list)
+            if is_same_dict(dic, empty_return_dic):
+                continue
+            else:
+                res.append(line2dic(header_list, data_list))
         return res
 
 
@@ -210,7 +208,7 @@ def name_standard(dic: dict) -> dict:
 
 
 # 判断输出结果是否正确,动态确定snap_tolerance
-def output_is_valid(res:list[dict])-> bool :
+def output_is_valid(res: list[dict]) -> bool:
     if res == empty_return_dic:
         return False
     if len(res) == 1:
@@ -220,4 +218,3 @@ def output_is_valid(res:list[dict])-> bool :
             if value == '':
                 return False
     return True
-

@@ -89,12 +89,16 @@ def clean_table(table: list[list[str]]):
 
 # 存储TableInfo的详细信息
 class TableInfo:
-    def __init__(self, table: pymupdf.table.Table, mark_flag: bool, blocks: list):
+    def __init__(self, table: pymupdf.table.Table, mark_flag: bool, blocks: list,header_len:int):
         # ====1==== 获取表格的基本信息
+        self.header_len = header_len
         self.mark_flag = mark_flag
         self.table = table
         self.extract_table = table.extract()
-        self.table_data = clean_table(self.extract_table)
+        # if self.header_len == len(self.extract_table[0]):
+        self.table_data = self.extract_table
+        # else:
+        #     self.table_data = clean_table(self.extract_table)
         # 行列基本信息
         self.row_count = len(self.table_data)  # 行数
         self.col_count = len(self.table_data[0])  # 列数

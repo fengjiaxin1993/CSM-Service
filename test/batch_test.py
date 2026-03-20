@@ -1,7 +1,7 @@
 import os
 
-from server.protection_pdf_extract.extract_api import extract_safe_table, output_standard, empty_return_dic
-from server.tools.base import output_is_valid
+from server.protection_pdf_extract.extract_api import extract_safe_table, output_standard, empty_return_dic, \
+    output_is_valid
 
 
 def extract_table(pdf_path: str):

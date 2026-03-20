@@ -8,14 +8,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# 获取文件目录所在页的方法
-# 找出页脚的block,判断是否包含 "目录"
-def is_outline_page(blocks):
-    sorted_blocks = sort_block(blocks)
-    last_block = sorted_blocks[-1]
-    return contain_key(last_block[4], "目录")
-
-
 # 抽取block_text信息
 # block_text:
 # 5 \n安全问题风险分析 ................ 132 \n
@@ -63,18 +55,35 @@ def get_match_num(blocks, key):
     return res
 
 
-# 根据span, 判断是否是页脚的正文
-def is_main_text_footer(span) -> bool:
-    # if contain_key(span['text'], '正文') and span['size'] == 9.0:
-    if contain_key(span['text'], '正文'):
-        return True
-    return False
 
+def is_outline_chapter(blocks) -> bool:
+    """
+    思路:获取原始信息,合并在同一个line中相同font_size的字体, 主要解决 目 录这种问题
+    :param blocks:
+    :return:
+    """
 
-# 判断是否是目录的章节标题
-def is_outline_chapter(span) -> bool:
-    if contain_key(span['text'], '目录') and 14.0 <= span['size'] <= 18.0:
-        return True
+    block_list = []
+    for idx, block in enumerate(blocks):
+        type = block['type']
+        bbox = block['bbox']
+        if type == 0:  # 只保留文本信息
+            lines = block["lines"]
+            for line in lines:
+                spans = line['spans']
+                direction = line["dir"]  # 获取文字方向向量
+                if direction[0] != 1.0 or direction[1] != 0.0:  # 去除倾斜方向的文字
+                    continue
+                font_text_list = merge_spans(spans)
+                for font, text in font_text_list:
+                    if text != '':
+                        info = (bbox[0], bbox[1], bbox[2], bbox[3], text, font, type)
+                        block_list.append(info)
+    for block in block_list:
+        text = block[4]
+        font_size = block[5]
+        if contain_key(text, '目录') and 14.0 <= font_size <= 18.0:
+            return True
     return False
 
 
@@ -122,9 +131,30 @@ def blocksContainKey(blocks, key):
     return False
 
 
+def merge_spans(spans):
+    res = []
+    for idx, span in enumerate(spans):
+        size = span['size']
+        text = span['text']
+        text = text.replace(" ", "")
+        if idx == 0:
+            res.append((size, text))
+        else:
+            last_size, last_text = res[-1]
+            if size == last_size:
+                res[-1] = (size, last_text + text)
+            else:
+                res.append((size, text))
+    return res
+
+
+start_chapter_keys = ["安全问题风险分析", "安全问题风险评估"]
+end_chapter_keys = ["等级测评结论"]
+
+
 # pdf解析类帮助方法
 class OutlineHelper:
-    def __init__(self, pdf_path, start_chapter="安全问题风险分析", end_chapter="等级测评结论"):
+    def __init__(self, pdf_path, start_chapter="安全问题风险", end_chapter="等级测评结论"):
         self.file_name = os.path.basename(pdf_path)
         # 最后在外部显示的信息
         self.start_page = 0  # 从1开始 安全问题风险 章节 开始所在页数
@@ -170,7 +200,8 @@ class OutlineHelper:
     # 找出(显示第几页，实际第几页)
     # 有些文档正文不是从第一页开始,例如 SA-MI07-HT24031-CP24705_张易第一风电场电力监控系统_测评报告.pdf
     def __get_show_info(self) -> (int, int):
-        for index in range(self.outline_end_page, min(self.outline_end_page + 40, self.total_page_num - 1)): # 目录结束后最多找40页
+        for index in range(self.outline_end_page,
+                           min(self.outline_end_page + 40, self.total_page_num - 1)):  # 目录结束后最多找40页
             page = self.doc.load_page(index)  # 目录结束后的第一页
             text = page.get_text("text")
             pattern = r"第(\d+)页"
@@ -193,20 +224,27 @@ class OutlineHelper:
         #             return index + 1
         # return 0
 
-    # 思路: 第一页目录包含三个目录关键字
+    # 思路: v1第一页目录包含三个目录关键字
+    # v2 判断目录所在位置，至少应该在页面上方，1/4处
     # 返回目录起始页
     def __get_outline_start_page(self) -> int:
-        for page_index in range(int(0.5 * self.total_page_num)):
+        """
+        思路: v1第一页目录包含三个目录关键字
+             v2 判断目录所在位置，至少应该在页面上方，1/4处
+        :return: 返回目录起始页码
+        """
+        for page_index in range(0, int(0.5 * self.total_page_num)):
             blocks = self.__get_origin_blocks_by_page_index(page_index)
-            spans = get_spans_by_blocks(blocks)
-            for span in spans:
-                if is_outline_chapter(span):
-                    return page_index + 1
+            if is_outline_chapter(blocks):
+                return page_index + 1
         return 0
 
-    # 思路: 从找到的目录页开始遍历,直到第一个不含目录的页数
-    # 返回目录结束页
     def __get_outline_end_page(self) -> int:
+        """
+        思路: 从找到的目录页开始遍历,直到第一个不含目录的页数
+        :return: 目录结束页
+        """
+
         for page_index in range(self.outline_start_page, self.outline_start_page + 200):  # 目录200页怎么也够了
             blocks = self.__get_origin_blocks_by_page_index(page_index)
             contain_flag = blocksContainKey(blocks, "目录")
@@ -215,10 +253,13 @@ class OutlineHelper:
             else:
                 return page_index
 
-    # 获取更详细的block文字信息
-    # 去除倾斜的水印信息
-    # (x0,y0,x1,y1,text,blok_index,type)
     def __get_blocks_by_page_index(self, page_index):
+        """
+        获取更详细的block文字信息
+        去除倾斜的水印信息
+        :param page_index:
+        :return: (x0,y0,x1,y1,text,font_size,type)
+        """
         page = self.doc.load_page(page_index)
         blocks = page.get_text("dict")['blocks']
         block_list = []
@@ -240,10 +281,6 @@ class OutlineHelper:
                 if merge_text != '':
                     block_list.append(info)
         return block_list
-
-    def __get_text_by_page(self, page_index):
-        page = self.doc.load_page(page_index)
-        return page.get_text()
 
     def __get_origin_blocks_by_page_index(self, page_index):
         page = self.doc.load_page(page_index)
@@ -308,8 +345,7 @@ def dir_test():
 
 
 def single_test():
-
-    pdf_path = r"D:\github\CSM-Service\file\01\SA-MI07-HT24031-CP24705_张易第一风电场电力监控系统_测评报告.pdf"
+    pdf_path = r"C:\Users\Administrator\Desktop\2018泉州供电公司调度自动化系统信息安全等级测评报告-S2A3G3.pdf"
 
     oh = OutlineHelper(pdf_path)
     print(f"起始页-结束页[{oh.start_page} - {oh.end_page}]")

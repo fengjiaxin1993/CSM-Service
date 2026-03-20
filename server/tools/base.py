@@ -8,6 +8,7 @@ from fastapi import UploadFile
 
 from config.basic_config import BASE_TEMP_DIR
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,7 +23,7 @@ def contain_key(text, keyword):
 
 # 对blocks按照从上往下进行排序
 # 解析下block信息 (x0,y0,x1,y1,text,blok_index,type)
-# (x0,y0)是矩形的左上角 (x1,y1)是矩形的右小角
+# (x0,y0)是矩形的左上角 (x1,y1)是矩形的右下角
 # block信息 (138.02000427246094, 240.28785705566406, 507.58001708984375, 252.81201171875, 'test', 9, 0)
 # 将block从前往后进行排序
 def sort_block(blocks):
@@ -129,7 +130,9 @@ def area_percent(a_bbox, b_bbox):  # 获取 a_bbox与b_bbox的交集面积/a_bbo
 
 def clean(txt: str):
     x = txt.strip()
-    return x.replace("\n", "")
+    x = x.replace(" ", "")
+    x = x.replace("\n", "")
+    return x
 
 
 def compute_str_md5(name: str) -> str:
@@ -149,3 +152,11 @@ def save_to_temp_file(file: UploadFile) -> str:
         f.write(file_content)
     return new_file_path
 
+
+def remove_dup_str(s):
+    n = len(s)
+    # 寻找最小重复单元
+    for i in range(1, n // 2 + 1):
+        if n % i == 0 and s[:i] * (n // i) == s:
+            return s[:i]
+    return s
