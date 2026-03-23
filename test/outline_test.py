@@ -5,7 +5,7 @@ import pymupdf
 
 
 pdf_path = r"C:\Users\Administrator\Desktop\2018泉州供电公司调度自动化系统信息安全等级测评报告-S2A3G3.pdf"
-start_page = 14
+start_page = 5
 
 with pymupdf.open(pdf_path) as doc:
     page = doc.load_page(start_page-1)

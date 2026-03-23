@@ -1,6 +1,8 @@
 from typing import List
 
 from fastapi import UploadFile, File
+
+from server.protection_pdf_extract.keywords_helper import KeyWordsHelper
 from server.tools.base import split_line, save_to_temp_file, remove_dup_str
 from server.protection_pdf_extract.outline_helper import OutlineHelper
 from server.protection_pdf_extract.table_helper import TableHelper
@@ -73,6 +75,34 @@ def upload_extract_safe_table(
         msg = f"{file.filename} 文件解析失败，报错信息为: {e}"
         logger.error(msg)
         return [empty_return_dic]
+
+
+def extract_dbcp_info(
+        file: UploadFile = File(..., description="上传文件"),
+) -> dict:
+    """
+    抽取等保测评表中的信息
+    """
+
+    try:
+        new_file_path = save_to_temp_file(file)
+        logger.info(f"【{file.filename}】 save success ，save to 【{new_file_path}】")
+        keywords_helper = KeyWordsHelper(new_file_path)
+        res = {
+            "report_time": keywords_helper.report_time,
+            "cpjl": keywords_helper.cpjl,
+            "score": keywords_helper.score
+        }
+        return res
+    except Exception as e:
+        msg = f"{file.filename} 文件解析失败，报错信息为: {e}"
+        logger.error(msg)
+        empty_res = {
+            "report_time": "",
+            "cpjl": "",
+            "score": ""
+        }
+        return empty_res
 
 
 # def upload_extract_safe_split_table(
@@ -182,6 +212,7 @@ def is_same_dict(dic1, dic2):
         if v != dic2[k]:
             return False
     return True
+
 
 def output_standard(table_list: list[list[str]]) -> list[dict]:
     if len(table_list) <= 1:

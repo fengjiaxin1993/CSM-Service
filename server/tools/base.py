@@ -148,8 +148,9 @@ def save_to_temp_file(file: UploadFile) -> str:
     new_file_prefix = compute_str_md5(prefix)
     new_file_name = new_file_prefix + "." + suffix
     new_file_path = os.path.join(BASE_TEMP_DIR, new_file_name)
-    with open(new_file_path, "wb") as f:
-        f.write(file_content)
+    if not os.path.exists(new_file_path):
+        with open(new_file_path, "wb") as f:
+            f.write(file_content)
     return new_file_path
 
 

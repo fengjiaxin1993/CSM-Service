@@ -150,9 +150,10 @@ def extract_table_from_pdf_with_bbox(pdf_path, page_num, bbox, dpi=200):
 
 if __name__ == "__main__":
     # 示例1：提取整页表格
-    page_num = 102
+    page_num = 5
     # PDF_PATH = r"C:\Users\Administrator\Desktop\2018泉州供电公司调度自动化系统信息安全等级测评报告-S2A3G3.pdf"
-    PDF_PATH = r"D:\工作\科东\智能安全研发分部\CSM\csm本地安装\表格提取csm服务\等保测评反馈\第二次反馈\00-识别成功的报告\等级测评报告-中宁县佳洋新能源有限公司-吴忠第五十九光伏电站电力监控系统-扫描.pdf"
+    # PDF_PATH = r"D:\工作\科东\智能安全研发分部\CSM\csm本地安装\表格提取csm服务\等保测评反馈\第二次反馈\00-识别成功的报告\等级测评报告-中宁县佳洋新能源有限公司-吴忠第五十九光伏电站电力监控系统-扫描.pdf"
+    pdf_path = r"C:\Users\Administrator\Desktop\2018泉州供电公司调度自动化系统信息安全等级测评报告-S2A3G3.pdf"
     table = extract_table_from_pdf(PDF_PATH, page_num, dpi=200)
     for line in table:
         print(line)
