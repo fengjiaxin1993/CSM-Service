@@ -26,17 +26,17 @@ def extract_table(
 
 
 # 将提取的表格修改后，逐项提出，将关联资产划分
-# def split_table(
-#         table_list: list[list[str]],
-#         split_char_list: list = list['、', '，'],
-#         key: str = '关联资产') -> list[list[str]]:
-#     header_list = table_list[0]
-#     data_list = table_list[1:]
-#     split_data_list = split_line(header_list, data_list, split_char_list, key)
-#     res_table_list = [header_list]
-#     for line in split_data_list:
-#         res_table_list.append(line)
-#     return res_table_list
+def split_table(
+        table_list: list[list[str]],
+        split_char_list: list = list['、', '，'],
+        key: str = '关联资产') -> list[list[str]]:
+    header_list = table_list[0]
+    data_list = table_list[1:]
+    split_data_list = split_line(header_list, data_list, split_char_list, key)
+    res_table_list = [header_list]
+    for line in split_data_list:
+        res_table_list.append(line)
+    return res_table_list
 
 
 def extract_safe_table(pdf_path: str) -> list[list[str]]:
@@ -47,14 +47,14 @@ def extract_safe_table(pdf_path: str) -> list[list[str]]:
         return empty_table_list
 
 
-# def extract_safe_split_table(pdf_path: str) -> list[list[str]]:
-#     table_list = extract_safe_table(pdf_path)
-#     if len(table_list) > 1:
-#         split_key = '关联资产'
-#         split_char_list = ['、', '，', ',']
-#         return split_table(table_list, split_char_list, split_key)
-#     else:
-#         return table_list
+def extract_safe_split_table(pdf_path: str) -> list[list[str]]:
+    table_list = extract_safe_table(pdf_path)
+    if len(table_list) > 1:
+        split_key = '关联资产'
+        split_char_list = ['、', '，', ',']
+        return split_table(table_list, split_char_list, split_key)
+    else:
+        return table_list
 
 
 def upload_extract_safe_table(
@@ -105,23 +105,23 @@ def extract_dbcp_info(
         return empty_res
 
 
-# def upload_extract_safe_split_table(
-#         file: UploadFile = File(..., description="上传文件"),
-# ) -> list[dict]:
-#     """
-#         将文件保存到临时目录.
-#         找到安全问题风险分析的表格，解决跨页问题，提取出原始表格后，对表格列（关联资产）进行划分，形成更详细的表格,json格式返回
-#         """
-#     try:
-#         new_file_path = save_to_temp_file(file)
-#         logger.info(f"【{file.filename}】 save success ，save to 【{new_file_path}】")
-#         table_list = extract_safe_split_table(new_file_path)
-#         res = output_standard(table_list)
-#         return res
-#     except Exception as e:
-#         msg = f"解析{file.filename} 失败，报错信息为: {e}"
-#         logger.error(msg)
-#         return [empty_return_dic]
+def upload_extract_safe_split_table(
+        file: UploadFile = File(..., description="上传文件"),
+) -> list[dict]:
+    """
+        将文件保存到临时目录.
+        找到安全问题风险分析的表格，解决跨页问题，提取出原始表格后，对表格列（关联资产）进行划分，形成更详细的表格,json格式返回
+        """
+    try:
+        new_file_path = save_to_temp_file(file)
+        logger.info(f"【{file.filename}】 save success ，save to 【{new_file_path}】")
+        table_list = extract_safe_split_table(new_file_path)
+        res = output_standard(table_list)
+        return res
+    except Exception as e:
+        msg = f"解析{file.filename} 失败，报错信息为: {e}"
+        logger.error(msg)
+        return [empty_return_dic]
 
 
 def remove_digit_str(str):
