@@ -9,12 +9,8 @@ empty_dic = {
     "name": "",
     "code": "",
     "level": 0,
-    "desc": "",
     "influence": "",
-    "check": "",
-    "repair": "",
-    "requirement": "",
-    "cve_code":""
+    "risk_table": [{"name": "", "code": "", "desc": "", "influence": "", "check": "", "repair": "", "requirement": ""}]
 }
 
 
