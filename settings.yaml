@@ -5,3 +5,7 @@ server:
 open_cross_domain: true
 
 debug: true
+
+# 预警单提取器版本配置
+# 可选值: "v1", "v2"
+warning_extract_version: "v1"

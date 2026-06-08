@@ -9,7 +9,7 @@ def run_api_server(host: str, port: int, open_cross_domain: bool, debug: bool):
 
 
 def read_config():
-    with open('settings.yaml', 'r') as f:
+    with open('settings.yaml', 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)  # 使用safe_load以避免潜在的安全风险，例如执行恶意代码的风险。
         return data
 
