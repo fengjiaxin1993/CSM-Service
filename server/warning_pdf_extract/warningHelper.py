@@ -1,7 +1,7 @@
 """
 预警单信息提取 - 版本路由入口
 
-通过 WarningHelper 类提供统一的对外接口（同名），内部根据 settings.yaml 中的
+通过 WarningHelper 类提供统一的对外接口（同名），内部根据 app_config 中的
 warning_extract_version 配置自动路由到 v1 或 v2 实现。
 
 部署时只需修改 settings.yaml:
@@ -13,10 +13,7 @@ warning_extract_version 配置自动路由到 v1 或 v2 实现。
     result = wh.extract_info()
 """
 
-import yaml
-import os
-
-from config.basic_config import BASE_DIR
+from config.basic_config import app_config
 from server.warning_pdf_extract.v1 import WarningHelper as WarningHelperV1
 from server.warning_pdf_extract.v2 import WarningHelper as WarningHelperV2
 
@@ -29,22 +26,12 @@ _EXTRACTOR_MAP = {
 
 
 def _get_version_from_config() -> str:
-    """从 settings.yaml 读取版本配置，默认返回 v1"""
-    try:
-        config_path = os.path.join(
-            BASE_DIR,
-            "settings.yaml"
-        )
-        with open(config_path, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f)
-        version = data.get("warning_extract_version", "v1")
-        if version not in _EXTRACTOR_MAP:
-            print(f"[WARN] 未知版本配置: {version}，回退到 v1。可选: {list(_EXTRACTOR_MAP.keys())}")
-            return "v1"
-        return version
-    except Exception as e:
-        print(f"[WARN] 读取 warning_extract_version 配置失败: {e}，回退到 v1")
+    """从全局配置对象读取版本，默认返回 v1"""
+    version = app_config.get("warning_extract_version", "v1")
+    if version not in _EXTRACTOR_MAP:
+        print(f"[WARN] 未知版本配置: {version}，回退到 v1。可选: {list(_EXTRACTOR_MAP.keys())}")
         return "v1"
+    return version
 
 
 def get_active_version() -> str:
@@ -56,7 +43,7 @@ class WarningHelper:
     """
     预警单信息提取的统一入口。
 
-    内部根据 settings.yaml 中的 warning_extract_version 配置自动路由，
+    内部根据 app_config.warning_extract_version 配置自动路由，
     对外接口名称始终为 WarningHelper，保持完全一致。
     """
 
@@ -83,8 +70,3 @@ class WarningHelper:
 
 if __name__ == "__main__":
     print(f"当前激活版本: {get_active_version()}")
-    # path1 = r"C:\Users\Administrator\Desktop\预警单示例\1 个漏洞.pdf"
-    # wh = WarningHelper(path1)
-    # dic = wh.extract_info()
-    # for k, v in dic.items():
-    #     print(f"{k}: {v}")
