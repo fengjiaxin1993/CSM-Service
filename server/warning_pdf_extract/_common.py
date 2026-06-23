@@ -86,7 +86,7 @@ def get_normalize_match_dict(origin_dic) -> dict:
 chinese_value_key_dict = get_normalize_match_dict(chinese_key_values_dict)
 
 
-# ==================== 等级转换 ====================
+# ==================== 预警等级转换 ====================
 
 def get_warning_level_int(war: str) -> int:
     """
@@ -99,6 +99,23 @@ def get_warning_level_int(war: str) -> int:
         return 2
     elif war == "一般":
         return 3
+    else:
+        return 0
+
+# 漏洞级别
+def get_cve_level_int(war: str) -> int:
+    """
+    将中文预警等级转为整数。
+    低危=1, 中危=2, 高危=3, 超危=4, 其他=0
+    """
+    if war == "低危":
+        return 1
+    elif war == "中危":
+        return 2
+    elif war == "高危":
+        return 3
+    elif war == "超危":
+        return 4
     else:
         return 0
 
@@ -121,7 +138,7 @@ def extract_cve_code(txt: str) -> str:
 
 def remove_water(text, water_set: set):
     """去除文本中的水印字符"""
-    if text:
+    if len(text) > 2:
         for water in water_set:
             for ch in water:
                 text = text.replace(ch, "")

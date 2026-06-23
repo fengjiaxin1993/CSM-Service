@@ -8,13 +8,13 @@
     result = wh.extract_info()              # v1 兼容：返回扁平结构
     risk_table = wh.extract_risk_table()    # v2 能力：返回漏洞表格
 """
-
+import fitz
 import pymupdf
 from server.warning_pdf_extract._common import (
     contain_key, get_middle_text, text_strip, text_clean,
     chinese_key_values_dict, chinese_value_key_dict,
     get_warning_level_int, extract_cve_code,
-    remove_water, get_target_idx
+    remove_water, get_target_idx, get_cve_level_int
 )
 
 
@@ -262,11 +262,14 @@ class WarningHelper:
         """将二维表格数据转为字典列表"""
         code_idx = get_target_idx(table_data[0], "编号")
         name_idx = get_target_idx(table_data[0], "名称")
+        level_idx = get_target_idx(table_data[0], "级别")
+
 
         res_dic_list = []
         for row in table_data[1:]:
             dic = {
                 "name": row[name_idx],
+                "cve_level" : 0 if level_idx == -1 else get_cve_level_int(row[level_idx]),
                 "code": row[code_idx],
                 "desc": self._extract_desc(),
                 "influence": self._extract_influence(),
@@ -307,8 +310,10 @@ class WarningHelper:
                 "influence": dic["influence"],
                 "check": dic["check"],
                 "repair": dic["repair"],
+                "cve_level": 0,
                 "requirement": dic["requirement"]
             }]
+        dic["cve_count"] = len(dic["risk_table"])
         return dic
 
 

@@ -15,7 +15,8 @@ empty_dic = {
     "repair": "",
     "requirement": "",
     "cve_code": "",
-    "risk_table": [{"name": "", "code": "", "desc": "", "influence": "", "check": "", "repair": "", "requirement": ""}]
+    "cve_count":0,
+    "risk_table": [{"name": "", "code": "", "desc": "", "influence": "", "check": "", "repair": "", "requirement": "", "cve_level": 0}]
 }
 
 
