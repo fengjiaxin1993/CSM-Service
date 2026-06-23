@@ -152,3 +152,25 @@ def get_target_idx(header: list, target: str):
         if target in head:
             return idx
     return -1
+
+
+def get_table_bbox_list(page) :
+    find_result = page.find_tables()
+    table_box_list = []
+    page_bbox = page.rect.x0, page.rect.y0, page.rect.x1, page.rect.y1
+    if hasattr(find_result, 'tables'):
+        tables = find_result.tables
+    else:
+        tables = find_result
+    page_area = (page_bbox[2] - page_bbox[0])  * (page_bbox[3] - page_bbox[1])
+    for table in tables:
+        table_area = (table.bbox[2] - table.bbox[0]) * (table.bbox[3] - table.bbox[1])
+        if table_area / page_area < 0.9:
+            table_box_list.append(table.bbox)
+    return table_box_list
+
+def span_in_table(span_bbox, table_bbox_list):
+    for table_bbox in table_bbox_list:
+        if span_bbox[0] >= table_bbox[0] and span_bbox[1] >= table_bbox[1] and span_bbox[2] <= table_bbox[2] and span_bbox[3] <= table_bbox[3]:
+            return True
+    return False

@@ -14,7 +14,7 @@ from server.warning_pdf_extract._common import (
     contain_key, get_middle_text, text_strip, text_clean,
     chinese_key_values_dict, chinese_value_key_dict,
     get_warning_level_int, extract_cve_code,
-    remove_water, get_target_idx, get_cve_level_int
+    remove_water, get_target_idx, get_cve_level_int, get_table_bbox_list, span_in_table
 )
 
 
@@ -48,6 +48,8 @@ class WarningHelper:
             self.doc = pymupdf.open(path)
             for page_idx in range(self.doc.page_count):
                 page = self.doc.load_page(page_idx)
+
+                table_box_list = get_table_bbox_list(page)
                 blocks = page.get_text("dict")['blocks']
                 for idx, block in enumerate(blocks):
                     type_int = block['type']
@@ -60,8 +62,13 @@ class WarningHelper:
                                 for span in spans:
                                     text = span['text']
                                     self.water_text_set.add(text)
-                                continue
-                            self.span_list.extend(spans)
+                            else: # 正常文字
+                                for span in spans:
+                                    span_bbox = span['bbox']
+                                    in_table_flag = span_in_table(span_bbox, table_box_list)
+                                    if not in_table_flag:
+                                        self.span_list.append(span)
+
             self.text = self._get_text()
             self.water_mark_flag = len(self.water_text_set) > 0
             self._extract_risk_table()  # 尝试提取表格
